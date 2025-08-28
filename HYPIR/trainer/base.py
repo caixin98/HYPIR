@@ -449,3 +449,22 @@ class BaseTrainer:
             # Save ema weights
             self.ema_handler.save_ema_weights(save_path)
             logger.info(f"Saved ema weights to {save_path}")
+
+from datasets.piat_loader import create_train_dataloader, create_val_dataloader
+class SRDataTrainer(BaseTrainer):
+    def init_dataset(self):
+        self.dataloader = create_train_dataloader(self.config.data_config)
+    def prepare_batch_inputs(self, batch):
+        bs = len(batch["image"])
+        gt = (batch["image"] * 2 - 1).float()
+        lq = (batch["cond_image"] * 2 - 1).float()
+        c_txt = self.encode_prompt([""] * bs)
+        z_lq = self.vae.encode(lq.to(self.weight_dtype)).latent_dist.sample()
+        timesteps = torch.full((bs,), self.config.model_t, dtype=torch.long, device=self.device)
+        self.batch_inputs = BatchInput(
+            gt=gt, lq=lq,
+            z_lq=z_lq,
+            c_txt=c_txt,
+            timesteps=timesteps,
+            prompt=[""] * bs,
+        )

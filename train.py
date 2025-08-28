@@ -4,6 +4,7 @@ from omegaconf import OmegaConf
 from HYPIR.trainer.sd2 import SD2Trainer
 
 
+
 parser = ArgumentParser()
 parser.add_argument("--config", type=str, required=True)
 args = parser.parse_args()

@@ -22,8 +22,33 @@ class SD2Trainer(BaseTrainer):
         self.text_encoder = CLIPTextModel.from_pretrained(
             self.config.base_model_path, subfolder="text_encoder", torch_dtype=self.weight_dtype).to(self.device)
         self.text_encoder.eval().requires_grad_(False)
+        
+        # 预编码空的prompt
+        self.empty_prompt_embed = self._encode_empty_prompt()
+
+    def _encode_empty_prompt(self) -> torch.Tensor:
+        """预编码空的prompt，返回对应的text embedding"""
+        # 使用一个空的字符串作为空的prompt
+        empty_text = ""
+        txt_ids = self.tokenizer(
+            empty_text,
+            max_length=self.tokenizer.model_max_length,
+            padding="max_length",
+            truncation=True,
+            return_tensors="pt",
+        ).input_ids
+        text_embed = self.text_encoder(txt_ids.to(self.accelerator.device))[0]
+        return text_embed
 
     def encode_prompt(self, prompt: List[str]) -> Dict[str, torch.Tensor]:
+        # 检查prompt是否为空或只包含空字符串
+        if not prompt or all(not p.strip() for p in prompt):
+            # 返回预编码的空prompt embedding
+            batch_size = len(prompt) if prompt else 1
+            # 复制预编码的空embedding到batch size
+            empty_embed = self.empty_prompt_embed.repeat(batch_size, 1)
+            return {"text_embed": empty_embed}
+        
         txt_ids = self.tokenizer(
             prompt,
             max_length=self.tokenizer.model_max_length,
